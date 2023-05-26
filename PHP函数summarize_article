@@ -1,0 +1,56 @@
+<?php
+
+require_once 'vendor/autoload.php'; // Load required packages
+
+use GuzzleHttp\Client;
+use OpenAI\API\Model\CompletionRequest;
+
+function summarize_article($url) {
+    // Initialize Guzzle client
+    $client = new Client();
+    
+    // Make GET request to URL
+    $response = $client->request('GET', $url);
+    
+    // Extract article text from HTML response
+    $html = (string)$response->getBody();
+    $doc = new DOMDocument();
+    @$doc->loadHTML($html);
+    $xpath = new DOMXPath($doc);
+    $nodes = $xpath->query('//div[@class="article-body"]');
+    $text = '';
+    foreach ($nodes as $node) {
+        $text .= trim(preg_replace('/\s+/', ' ', $node->textContent));
+    }
+    
+    // Use OpenAI API to generate summary
+    $apiKey = 'YOUR_API_KEY';
+    $apiUrl = 'https://api.openai.com/v1/engines/davinci-codex/completions';
+    $prompt = "Summarize the following article:\n\n" . $text;
+    $model = 'davinci-codex';
+    $params = [
+        'prompt' => $prompt,
+        'max_tokens' => 60,
+        'temperature' => 0.7,
+        'stop' => ['\n']
+    ];
+    $headers = [
+        'Authorization' => 'Bearer ' . $apiKey,
+        'Content-Type' => 'application/json',
+    ];
+    $client = new Client();
+    $response = $client->post($apiUrl, [
+        'headers' => $headers,
+        'json' => [
+            'model' => $model,
+            'prompt' => $params['prompt'],
+            'temperature' => $params['temperature'],
+            'max_tokens' => $params['max_tokens'],
+            'stop' => $params['stop']
+        ]
+    ]);
+    $data = json_decode($response->getBody(), true);
+    $summary = $data['choices'][0]['text'];
+    
+    return $summary;
+}
